@@ -67,12 +67,12 @@ jobs:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         cluster-name: ${{ env.CLUSTER_NAME }}
         resource-group: ${{ env.RESOURSE_GROUP }}
-    - name: Set AKS Context
-      uses: Azure/aks-set-context@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-        cluster-name: aks-cluster
-        resource-group: rg-aks-cluster        
+    # - name: Set AKS Context
+    #   uses: Azure/aks-set-context@v1
+    #   with:
+    #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+    #     cluster-name: aks-cluster
+    #     resource-group: rg-aks-cluster        
 
     - uses: Azure/k8s-deploy@v1
       with:
