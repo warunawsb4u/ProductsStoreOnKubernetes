@@ -49,7 +49,7 @@ jobs:
       
     - name: Push Image to Docker Hub
       run:
-        docker push hub.docker.com/repository/docker/wsb4u/productstore:$GITHUB_RUN_NUMBER
+        docker push wsb4u/productstore:$GITHUB_RUN_NUMBER
    
     - uses: cschleiden/replace-tokens@v1
       with:
