@@ -14,8 +14,8 @@ jobs:
   build-deploy-aks:
     runs-on: ubuntu-latest
     env:
-      DOCKER_REPOSITORY: productstore # name of Docker Hub ID
-      IMAGE_NAME: webapp
+      DOCKER_REPOSITORY: wsb4u # name of Docker Hub ID
+      IMAGE_NAME: productstore
       IMAGE_TAG: ${{ github.run_number }} # $GITHUB_RUN_NUMBER
       
       CLUSTER_NAME: aks-cluster
