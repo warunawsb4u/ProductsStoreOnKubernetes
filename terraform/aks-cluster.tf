@@ -1,6 +1,6 @@
 resource "azurerm_resource_group" "rg" {
   name     = "rg-aks-cluster"
-  location = "East US"
+  location = "West US 3"
 }
 
 resource "azurerm_kubernetes_cluster" "test" {
