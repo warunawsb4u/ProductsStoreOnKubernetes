@@ -17,6 +17,10 @@ variable "kubernetes_version" {
 variable "acr_name" {
   default = "acrforaks2022"
 }
+variable "subscription_id" {
+  type      = string
+  sensitive = true
+}
 
 variable "sql_name" {
   default = "mssql-2022"
