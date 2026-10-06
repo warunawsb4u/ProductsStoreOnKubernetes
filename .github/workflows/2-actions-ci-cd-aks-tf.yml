@@ -123,6 +123,24 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       run: |
         terraform plan -no-color 
+    - name: Test Azure connection
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      run: |
+        az login \
+          --service-principal \
+          --username "$ARM_CLIENT_ID" \
+          --password "$ARM_CLIENT_SECRET" \
+          --tenant "$ARM_TENANT_ID"
+    
+        az account show
+    
+        az group list \
+          --subscription "$ARM_SUBSCRIPTION_ID" \
+          -o table        
 
     - name: Terraform Apply
       env:
