@@ -114,15 +114,17 @@ jobs:
     #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
     #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    # - name: Terraform Plan
+    #   id: plan
+    #   env:
+    #     ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+    #     ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+    #     ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+    #     ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+    #   run: |
+    #     terraform plan -no-color 
     - name: Terraform Plan
-      id: plan
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      run: |
-        terraform plan -no-color 
+      run: terraform plan -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
     - name: Test Azure connection
       env:
         ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
