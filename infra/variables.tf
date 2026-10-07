@@ -43,7 +43,7 @@ variable "storage_name" {
 }
 
 variable "resource_group_name" {
-  default = "aks-k8s-2020"
+  default = "rg-aks-cluster"
 }
 
 variable "location" {
