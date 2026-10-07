@@ -5,8 +5,7 @@ on:
     branches: [ main ]
     paths: .github/workflows/2-actions-ci-cd-aks-tf.yml
   pull_request:
-    branches:  none # [ main ]
-  # Allows you to run this workflow manually from the Actions tab
+    branches: none
   workflow_dispatch:
 
 jobs:
@@ -16,28 +15,38 @@ jobs:
     env:
       DOCKER_REPOSITORY: wsb4u
       IMAGE_NAME: productstore
-      IMAGE_TAG: ${{ github.run_number }} # ${{ github.sha }}
+      IMAGE_TAG: ${{ github.run_number }}
       AKS_RESOURCE_GROUP: rg-aks-cluster
       AKS_NAME: aks-cluster-new
       ACR_NAME: acrforakstf023
       TERRAFORM_VERSION: 1.1.9
       WORKING_DIRECTORY: infra
-    
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+      # ARM credentials available to ALL steps automatically
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
     defaults:
       run:
         shell: bash
         working-directory: ${{ env.WORKING_DIRECTORY }}
-        
+
     steps:
 
     - uses: actions/checkout@v2
-  
+
+    # ─── Docker Build & Push ────────────────────────────────────────────────
+
     - name: Build Docker Image
       working-directory: .
       run:
-        docker build ./MvcApp/ --file ./MvcApp/Dockerfile --tag $DOCKER_REPOSITORY/$IMAGE_NAME:$GITHUB_RUN_NUMBER --build-arg=token=ZGEzNTQ5Y2QyNjAx --no-cache
-  
+        docker build ./MvcApp/ --file ./MvcApp/Dockerfile
+          --tag $DOCKER_REPOSITORY/$IMAGE_NAME:$GITHUB_RUN_NUMBER
+          --build-arg=token=ZGEzNTQ5Y2QyNjAx
+          --no-cache
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       continue-on-error: true
@@ -48,19 +57,17 @@ jobs:
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'MEDIUM,HIGH,CRITICAL'
+
     - name: Docker Login
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}        
-  
-    # - name: Login to Docker Hub
-    #   run: |
-    #     echo "${{ secrets.DOCKER_REPOSITORY_PASSWORD }}" | docker login -u $DOCKER_REPOSITORY --password-stdin
-        
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
     - name: Push Image to Docker Hub
-      run:
-        docker push wsb4u/productstore:$GITHUB_RUN_NUMBER
+      run: docker push $DOCKER_REPOSITORY/$IMAGE_NAME:$GITHUB_RUN_NUMBER
+
+    # ─── Terraform Setup ────────────────────────────────────────────────────
 
     - name: Replace tokens in terraform.tfvars
       uses: cschleiden/replace-tokens@v1.0
@@ -76,7 +83,19 @@ jobs:
         DB_ADMIN_LOGIN: houssem
         DB_ADMIN_PASSWORD: "@Aa123456"
         STORAGE_NAME: storageforsql011
-    
+        LOCATION: "eastus2"
+
+    - name: Validate no unreplaced tokens
+      working-directory: infra
+      run: |
+        echo "=== terraform.tfvars after replacement ==="
+        cat terraform.tfvars
+        if grep -q "__.*__" terraform.tfvars; then
+          echo "❌ Unreplaced tokens found!"
+          exit 1
+        fi
+        echo "✅ All tokens replaced"
+
     - name: Replace azurerm with local in backend.tf
       uses: jacobtomlinson/gha-find-replace@v2
       with:
@@ -85,152 +104,53 @@ jobs:
         include: "infra/backend.tf"
         regex: true
 
-    # Install the latest version of Terraform CLI
     - name: Install Terraform
-      uses: hashicorp/setup-terraform@v1
+      uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
-        
+
     - name: Terraform Init
-      id: init
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      run:
-        terraform init
-  
-    # Checks that all Terraform configuration files adhere to a canonical format
+      run: terraform init
+
     - name: Terraform Format
-      id: format
       run: terraform fmt -check
       continue-on-error: true
 
-    # - name: Azure Login
-    #   uses: azure/login@v2
-    #   with:
-    #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
-    #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-    #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    # ─── Azure Login & Terraform Plan/Apply ─────────────────────────────────
 
-    # - name: Terraform Plan
-    #   id: plan
-    #   env:
-    #     ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-    #     ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-    #     ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-    #     ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-    #   run: |
-    #     terraform plan -no-color 
-    # - name: Terraform Plan
-    #   run: terraform plan -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-    # - name: Test Azure connection
-    #   env:
-    #     ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-    #     ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-    #     ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-    #     ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-    #   run: |
-    #     az login \
-    #       --service-principal \
-    #       --username "$ARM_CLIENT_ID" \
-    #       --password "$ARM_CLIENT_SECRET" \
-    #       --tenant "$ARM_TENANT_ID"
-    
-    #     az account show
-    
-    #     az group list \
-    #       --subscription "$ARM_SUBSCRIPTION_ID" \
-    #       -o table        
-    # - name: Check Azure subscription
-    #   run: |
-    #     az account list -o table
-    #     echo "Current account:"
-    #     az account show -o table          
     - name: Azure Login
       uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
-    # - name: Terraform Plan
-    #   env:
-    #     ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-    #     ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-    #     ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-    #     ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-    #   run: terraform plan
-    - name: Terraform Plan
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      run: terraform plan -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
-    
-    - name: Terraform Import Existing Resources
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      run: |
-        terraform import azurerm_resource_group.rg \
-          /subscriptions/${{ secrets.ARM_SUBSCRIPTION_ID }}/resourceGroups/${{ env.AKS_RESOURCE_GROUP }} || true
 
-    - name: Terraform Remove RG from State
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      run: terraform state rm azurerm_resource_group.rg || true 
-    - name: Replace tokens in terraform.tfvars
-      uses: cschleiden/replace-tokens@v1.0
-      with:
-        tokenPrefix: __
-        tokenSuffix: __
-        files: infra/terraform.tfvars
-      env:
-        AKS_RESOURCE_GROUP: ${{ env.AKS_RESOURCE_GROUP }}
-        AKS_NAME: ${{ env.AKS_NAME }}
-        ACR_NAME: ${{ env.ACR_NAME }}
-        SQL_INSTANCE_NAME: sqlforaks-tf-011
-        DB_ADMIN_LOGIN: houssem
-        DB_ADMIN_PASSWORD: "@Aa123456"
-        STORAGE_NAME: storageforsql011
-        LOCATION: "eastus2"    # ✅ add this line        
+    - name: Terraform Plan
+      run: terraform plan
+
     - name: Terraform Apply
-      env:
-        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       run: terraform apply -auto-approve
-                
+
+    # ─── Kubernetes Deploy ──────────────────────────────────────────────────
 
     - name: Replace Image Name in Deployment
       uses: cschleiden/replace-tokens@v1
       with:
         files: '["kubernetes/*.yaml"]'
-        tokenPrefix: __ # optional, default is #{
-        tokenSuffix: __ # optional, default is }#
+        tokenPrefix: __
+        tokenSuffix: __
       env:
         DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
         IMAGE_NAME: ${{ env.IMAGE_NAME }}
         IMAGE_TAG: ${{ env.IMAGE_TAG }}
 
-    # Set the target AKS cluster.
-    - uses: Azure/aks-set-context@v1
+    - name: Set AKS Context
+      uses: Azure/aks-set-context@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-        cluster-name: ${{ env.CLUSTER_NAME }}
-        resource-group: ${{ env.RESOURSE_GROUP }}
-        
-    - uses: Azure/k8s-deploy@v1
+        cluster-name: ${{ env.AKS_NAME }}            # ✅ fixed: was CLUSTER_NAME
+        resource-group: ${{ env.AKS_RESOURCE_GROUP }} # ✅ fixed: was RESOURSE_GROUP (typo)
+
+    - name: Deploy to AKS
+      uses: Azure/k8s-deploy@v1
       with:
         manifests: |
           kubernetes/mssql-pv.azure.yaml
@@ -238,7 +158,9 @@ jobs:
           kubernetes/mssql-secret.yaml
           kubernetes/mssql-deployment.yaml
           kubernetes/mvc-deployment.azure.yaml
-    
+
+    # ─── Security Checks ────────────────────────────────────────────────────
+
     - name: Run Kube-Bench to check cluster config
       continue-on-error: true
       run: |
