@@ -195,6 +195,21 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       run: terraform apply -auto-approve
+    - name: Replace tokens in terraform.tfvars
+      uses: cschleiden/replace-tokens@v1.0
+      with:
+        tokenPrefix: __
+        tokenSuffix: __
+        files: infra/terraform.tfvars
+      env:
+        AKS_RESOURCE_GROUP: ${{ env.AKS_RESOURCE_GROUP }}
+        AKS_NAME: ${{ env.AKS_NAME }}
+        ACR_NAME: ${{ env.ACR_NAME }}
+        SQL_INSTANCE_NAME: sqlforaks-tf-011
+        DB_ADMIN_LOGIN: houssem
+        DB_ADMIN_PASSWORD: "@Aa123456"
+        STORAGE_NAME: storageforsql011
+        LOCATION: "eastus2"    # ✅ add this line      
                 
 
     - name: Replace Image Name in Deployment
