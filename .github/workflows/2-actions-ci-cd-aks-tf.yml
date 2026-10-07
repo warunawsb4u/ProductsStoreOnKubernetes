@@ -168,15 +168,26 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       run: terraform plan -var="subscription_id=${{ secrets.ARM_SUBSCRIPTION_ID }}"
     
-              
+    - name: Terraform Import Existing Resources
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      run: |
+        terraform import azurerm_resource_group.rg \
+          /subscriptions/${{ secrets.ARM_SUBSCRIPTION_ID }}/resourceGroups/${{ env.AKS_RESOURCE_GROUP }} || true
+    
     - name: Terraform Apply
       env:
         ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
         ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}  # ✅ add this
+        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       run: terraform apply -auto-approve
+                
 
     - name: Replace Image Name in Deployment
       uses: cschleiden/replace-tokens@v1
