@@ -47,5 +47,5 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  default = "westeurope"
+  default = "westus"
 }
